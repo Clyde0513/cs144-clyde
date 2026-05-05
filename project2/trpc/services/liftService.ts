@@ -2,21 +2,41 @@ import { getLatestBatch } from '../../utils/mongodb.js';
 import { Lift } from '../types/lift.js';
 import { fetchFromCache, cacheResult } from '../../utils/redis.js';
 import { BatchType } from '../../models/Enum.js';
+import { getLocalTimestamp } from '../../utils/dates.js';
 
 export const LiftService = {
   // TODO: Implement a method that returns the latest lift array.
   // This should fetch the latest LiftBatch and return its `lifts` field,
   // or [] if no batch exists.
   async getLatestLifts(): Promise<Lift[]> {
-    console.log("getLatestLifts service method not yet implemented");
-    return [];
+    const LatestLiftBatch = await getLatestBatch(BatchType.LiftBatch);
+    if (!LatestLiftBatch) {
+      console.log("No lift batch found");
+      return [];
+    }
+    return LatestLiftBatch.lifts;
+    // console.log("getLatestLifts service method not yet implemented");
+    // return [];
   },
 
   // TODO: Implement a method that returns a single lift by name.
   // Search the latest batch for a matching name. Return null if not found.
   async getLiftByName(name: string): Promise<Lift | null> {
-    console.log("getLiftByName service method not yet implemented");
-    return null;
+
+    const LatestLiftBatchByName = await getLatestBatch(BatchType.LiftBatch);
+
+    if (!LatestLiftBatchByName) {
+      console.log("No lift batch found");
+      return null;
+    }
+    const lift = LatestLiftBatchByName.lifts.find((lift: { name: string; }) => lift.name === name);
+    if (!lift) {
+      console.log(`Lift "${name}" not found in latest batch`);
+      return null;
+    }
+    return lift;
+    // console.log("getLiftByName service method not yet implemented");
+    // return null;
   },
 
   // TODO: Implement a method that updates a lift's status in the cache.
@@ -30,7 +50,30 @@ export const LiftService = {
   // Hint: you'll need a helper to produce a current timestamp string.
   // Check utils/ for something useful — you may need to add an import.
   async updateLiftStatus(name: string, status: string): Promise<{ success: boolean, message: string }> {
-    console.log("updateLiftStatus service method not yet implemented");
-    return { success: false, message: "Not implemented" };
+
+    let  cachedBatch = await fetchFromCache(BatchType.LiftBatch) as any;
+
+    if (!cachedBatch) {
+      const mongooBatch = await getLatestBatch(BatchType.LiftBatch);
+      if (!mongooBatch) {
+        return { success: false, message: "No lift batch in cache" };
+      }
+      await cacheResult(BatchType.LiftBatch, mongooBatch);
+      cachedBatch = mongooBatch;
+
+    }
+    const liftIndex = cachedBatch.lifts.findIndex((lift: { name: string; }) => lift.name === name);
+    if (liftIndex === -1) { // -1 cuz findIndex returns -1 if not found
+      return { success: false, message: `Lift "${name}" not found in cached batch` };
+    }
+
+    cachedBatch.lifts[liftIndex].status = status;
+    cachedBatch.lifts[liftIndex].lastUpdated = getLocalTimestamp();
+
+    await cacheResult(BatchType.LiftBatch, cachedBatch);
+    return { success: true, message: `Lift "${name}" status updated to "${status}"` };
+
+    // console.log("updateLiftStatus service method not yet implemented");
+    // return { success: false, message: "Not implemented" };
   }
 };

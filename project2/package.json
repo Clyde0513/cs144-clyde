@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "main": "api.js",
   "scripts": {
-    "start": "tsx api.js",
-    "dev": "tsx watch api.js",
+    "start": "node api.js",
+    "dev": "node --watch api.js",
     "build": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1",
     "clean": "rm -rf dist/ node_modules/ package-lock.json",

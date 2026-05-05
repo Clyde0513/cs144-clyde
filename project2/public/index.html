@@ -403,28 +403,135 @@ const statusOptions = {
 // Web Storage API functions (Task 5)
 function saveTabSelection(tabName) {
   // TODO: Persist the tab selection and update the URL.
+
+  const url = new URL(window.location);
+  url.searchParams.set('tab', tabName);
+
+  const currentTab = new URLSearchParams(window.location.search).get('tab');
+  if (currentTab === tabName) {
+    window.history.replaceState({ tab: tabName }, '', url);
+  } else {
+    window.history.pushState({ tab: tabName }, '', url);
+  }
+
+  localStorage.setItem('activeTab', tabName);
+  
+
 }
 
 function loadTabSelection() {
-  // TODO: Return the active tab, considering URL, storage, and a default.
-}
+  // URL param takes priority, then localStorage, then default to 'trail'.
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlTab = urlParams.get('tab');
+  if (urlTab && (urlTab === 'trail' || urlTab === 'lift')) {
+    return urlTab;
+  }
 
+  const storedTab = localStorage.getItem('activeTab');
+  if (storedTab && (storedTab === 'trail' || storedTab === 'lift')) {
+    return storedTab;
+  }
+
+
+  return 'trail';
+
+}
 // Bearer-token helpers (Task 6A)
+
+let _tokenPromise = null;
 
 async function getToken() {
   // TODO: Return a valid bearer token, fetching a new one if needed.
-  return null;
+
+  const storedToken = sessionStorage.getItem('apiToken');
+  const storedExpiry = sessionStorage.getItem('apiTokenExpiry');
+
+  if (storedToken && storedExpiry && Date.now() < parseInt(storedExpiry, 10)) {
+    return storedToken;
+  }
+
+  if (!_tokenPromise) {
+    _tokenPromise = fetch('/api/auth/token', { method: 'POST' })
+      .then(async response => {
+        if (response.ok) {
+          const { token, expiresIn } = await response.json();
+          sessionStorage.setItem('apiToken', token);
+          sessionStorage.setItem('apiTokenExpiry', String(Date.now() + expiresIn * 1000));
+          return token;
+        }
+        console.error('Failed to fetch token:', response.statusText);
+        return null;
+      })
+      .catch(error => {
+        console.error('Error fetching token:', error);
+        return null;
+      })
+      .finally(() => { _tokenPromise = null; });
+  }
+
+  return _tokenPromise;
+
 }
 
-async function apiFetch(path, init = {}) {
+async function apiFetch(path, init = {}, retry = true) {
   // TODO: Wrap fetch with auth and rate-limit handling.
-  return fetch(path, init);
+
+  const token = await getToken();
+
+  if (!token) {
+    throw new Error ("can't fetch API data without a valid token");
+  }
+
+  const reqInit = {
+    ...init,
+    headers: {
+      ...init.headers,
+      'Authorization': `Bearer ${token}`
+    }
+  };
+
+  const resp = await fetch(path, reqInit);
+
+  if (resp.status === 401 && retry){
+    sessionStorage.removeItem('apiToken');
+    sessionStorage.removeItem('apiTokenExpiry');
+    return apiFetch(path, init, false);
+  }
+
+    if (resp.status === 429) {
+    const data = await resp.json();
+    showRateLimitBanner(data.limit, data.retryAfter);
+  }
+
+  return resp;
+
 }
 
 // Rate-limit banner (Task 6B)
 function showRateLimitBanner(limit, retryAfter) {
   // TODO: Show the rate-limit banner with a countdown.
+  const rateLimitBanner = document.getElementById('rateLimitBanner');
+  let sec = retryAfter;
+
+
+  // Rate limit exceeded by X req/min
+  rateLimitBanner.textContent = `Rate limit exceeded by (${limit} req/min). Try again in ${sec} seconds.`;
+  
+
+  rateLimitBanner.classList.add('visible');
+
+  const intervalIds = setInterval(() => {
+    sec -= 1;
+    if (sec > 0) {
+      rateLimitBanner.textContent = `Rate Limit exceeded by (${limit} req/min). Try again in ${sec} seconds.`;
+    } else{
+      rateLimitBanner.classList.remove('visible');
+      clearInterval(intervalIds);
+    }
+  }, 1000);
 }
+
+  
 
 // New functions for saving form state
 function saveFormState(entityValue, statusValue) {
@@ -836,10 +943,28 @@ async function fetchAndRender() {
   try {
 
     // TODO: Fetch trail and lift data from your REST API using apiFetch.
+    // call GET /api/trails and GET /api/lifts, populate the on-page state
+
+    const [trailsResponse, liftsResponse] = await Promise.all([
+      apiFetch('/api/trails'),
+      apiFetch('/api/lifts'),
+    ]);
+
+    if (!trailsResponse.ok || !liftsResponse.ok) {
+      throw new Error('Failed to fetch data');
+    }
+
+    const trailBatch = await trailsResponse.json();
+    const liftBatch  = await liftsResponse.json();
+
+    trailData = trailBatch.trails ?? [];
+    liftData  = liftBatch.lifts   ?? [];
     
     // Clear any filtered data
     filteredTrailData = [];
     filteredLiftData = [];
+
+    
     
     // Reset pagination
     currentPage.trail = 0;
@@ -869,6 +994,14 @@ async function submitStatus() {
   const [type, name] = entity.split(':');
   try {
     // TODO: Call your update endpoint using apiFetch.
+
+    const response = await apiFetch(`/api/update/${type}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, status })
+    });
+
+
     
     // Clear the form and local storage state
     document.getElementById('entitySelect').value = "";
@@ -914,7 +1047,11 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelector(`.tab-btn[data-tab="${savedTab}"]`).classList.add('active');
   }
 
-  // TODO: Register a popstate listener for back/forward tab switching.
+  // Back/forward button support: re-read the tab from the URL on navigation.
+  window.addEventListener('popstate', function(event) {
+    const tab = (event.state && event.state.tab) ? event.state.tab : loadTabSelection();
+    switchTab(tab);
+  });
 
   // Initial data fetch
   fetchAndRender();

@@ -38,8 +38,27 @@ router.get('/', async (req, res) => {
   try {
     // TODO: fetch the latest LiftBatch.
     // Look up cache → on miss, query MongoDB → write the result back to cache → return.
-    console.log("This endpoint is not yet implemented");
-    res.status(501).json({ error: "Not implemented" });
+
+    const cachedBatch = await fetchFromCache(ObjectType.lift);
+
+    if (cachedBatch) {
+      console.log("Data found in cache");
+      return res.json(cachedBatch);
+    } else {
+      console.log("Data not found in cache");
+      console.log("Fetching data from MongoDB");
+    
+      const latestBatch = await getLatestBatch(BatchType.LiftBatch);      
+      if (!latestBatch) {
+        return res.status(404).json({ error: "No lift batch found" });
+      } 
+      await cacheResult(ObjectType.lift, latestBatch);
+      // console.log("Writing data to cache");
+      return res.json(latestBatch);
+    }
+
+    // console.log("This endpoint is not yet implemented");
+    // res.status(501).json({ error: "Not implemented" });
   } catch (error) {
     console.error("Error in GET /api/lifts:", error);
     res.status(500).json({ error: "Internal server error" });
@@ -52,25 +71,41 @@ router.get('/:name', async (req, res) => {
     // TODO: return the named lift from the latest batch.
     // Look up cache → on miss, query MongoDB → write the result back to cache → return.
     // If the lift does not exist, return 404 with { error: "Lift not found" }.
-    console.log("This endpoint is not yet implemented");
-    res.status(501).json({ error: "Not implemented" });
+
+    const cachedBatch = await fetchFromCache(ObjectType.lift);
+
+    if (cachedBatch) {
+      // console.log("Data found in cache");
+      const lift = cachedBatch.lifts.find(l => l.name === req.params.name);
+      if (!lift) {
+        return res.status(404).json({ error: "Lift not found" });
+      }
+      return res.json(lift);
+
+    } 
+    else {
+      // console.log("Data not found in cache");
+      // console.log("Fetching data from MongoDB");
+
+      const latestBatch = await getLatestBatch(BatchType.LiftBatch);
+      if (!latestBatch) {
+        return res.status(404).json({ error: "No lift batch found" });
+      }
+
+      await cacheResult(ObjectType.lift, latestBatch);
+      const lift = latestBatch.lifts.find(l => l.name === req.params.name);
+      if (!lift) {
+        return res.status(404).json({ error: "Lift not found" });
+      }
+
+      return res.json(lift);
+    }
+
+
+    // console.log("This endpoint is not yet implemented");
+    // res.status(501).json({ error: "Not implemented" });
   } catch (error) {
     console.error("Error in GET /api/lifts/:name:", error);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// GET /api/lifts/:name/:field — single field of a specific lift
-router.get('/:name/:field', async (req, res) => {
-  try {
-    // TODO: return only the requested field of the named lift.
-    // Look up cache → on miss, query MongoDB → write the result back to cache → return.
-    // If the lift does not exist, return 404 with { error: "Lift not found" }.
-    // If the field does not exist on the lift, return 404 with { error: "Field not found" }.
-    console.log("This endpoint is not yet implemented");
-    res.status(501).json({ error: "Not implemented" });
-  } catch (error) {
-    console.error("Error in GET /api/lifts/:name/:field:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -82,10 +117,83 @@ router.get('/at/:timestamp', async (req, res) => {
     // Validate the timestamp format (e.g. 2025-05-01T14:25:00). Return 400 if invalid.
     // If no batch exists at or before the given timestamp, return 404.
     // DO NOT cache this endpoint.
-    console.log("This endpoint is not yet implemented");
-    res.status(501).json({ error: "Not implemented" });
+    // console.log("This endpoint is not yet implemented");
+    // res.status(501).json({ error: "Not implemented" });
+
+    const timestamp = req.params.timestamp;
+
+    if (timestamp === undefined || isNaN(Date.parse(timestamp))) {
+      return res.status(400).json({ error: "Invalid timestamp format" });
+    }
+
+    const nearestBatch = await getNearestBatch(BatchType.LiftBatch, timestamp);
+    if (!nearestBatch) {
+      return res.status(404).json({ error: "No lift batch found at or before the given timestamp" });
+    }
+
+    return res.json(nearestBatch);
+
+
   } catch (error) {
     console.error("Error in GET /api/lifts/at/:timestamp:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+// GET /api/lifts/:name/:field — single field of a specific lift
+router.get('/:name/:field', async (req, res) => {
+  try {
+    // TODO: return only the requested field of the named lift.
+    // Look up cache → on miss, query MongoDB → write the result back to cache → return.
+    // If the lift does not exist, return 404 with { error: "Lift not found" }.
+    // If the field does not exist on the lift, return 404 with { error: "Field not found" }.
+
+    const cachedBatch = await fetchFromCache(ObjectType.lift);
+
+    if (cachedBatch) {
+
+      const lift = cachedBatch.lifts.find(l => l.name === req.params.name);
+
+      if (!lift) {
+        return res.status(404).json({ error: "Lift not found" });
+      }
+
+      const fieldValue = lift[req.params.field];
+      
+      if (fieldValue === undefined) {
+        return res.status(404).json({ error: "Field not found" });
+      }
+      return res.json({ name: lift.name, [req.params.field]: fieldValue });
+
+    }
+
+    else {
+      const latestBatch = await getLatestBatch(BatchType.LiftBatch);
+      if (!latestBatch) {
+        return res.status(404).json({ error: "No lift batch found" });
+      }
+
+      await cacheResult(ObjectType.lift, latestBatch);
+      const lift = latestBatch.lifts.find(l => l.name === req.params.name);
+
+      if (!lift) {
+        return res.status(404).json({ error: "Lift not found" });
+      }
+
+      const fieldValue = lift[req.params.field];
+      if (fieldValue === undefined) {
+        return res.status(404).json({ error: "Field not found" });
+      }
+
+      return res.json({ name: lift.name, [req.params.field]: fieldValue });
+    }
+
+
+    // console.log("This endpoint is not yet implemented");
+    // res.status(501).json({ error: "Not implemented" });
+  } catch (error) {
+    console.error("Error in GET /api/lifts/:name/:field:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -107,5 +215,58 @@ router.get('/at/:timestamp', async (req, res) => {
  *
  * The route path should clearly identify both the resource and what's being changed.
  */
+
+router.patch('/:name/status', async (req, res) => {
+
+  // I'm just updating/modifying the resource because of the UPDATE/STATUS in the endpoint 
+  // So I think PATCH is the most correct HTTP method to use here. 
+  // PUT would be more appropriate if we were replacing the entire lift resource, 
+  // but since we're only updating the status (and lastUpdated), PATCH is the more ok for this partial update.
+
+  try {
+    const { status } = req.body;
+    const liftName = req.params.name;
+
+    if (!Object.values(LiftStatus).includes(status)) {
+      return res.status(400).json({ error: "Invalid status value" });
+    }
+
+    const cachedBatch = await fetchFromCache(ObjectType.lift);
+
+    if (cachedBatch) {
+      const lift = cachedBatch.lifts.find(l => l.name === liftName);
+
+      if (!lift) {
+        return res.status(404).json({ error: "Lift not found" });
+      }
+
+      lift.status = status;
+      lift.lastUpdated = new Date().toISOString();
+      await cacheResult(ObjectType.lift, cachedBatch);
+      return res.json(lift);
+      
+    } else {
+      const latestBatch = await getLatestBatch(BatchType.LiftBatch);
+      if (!latestBatch) {
+        return res.status(404).json({ error: "No lift batch found" });
+      }
+
+      const lift = latestBatch.lifts.find(l => l.name === liftName);
+      if (!lift) {
+        return res.status(404).json({ error: "Lift not found" });
+      }
+
+      lift.status = status;
+      lift.lastUpdated = new Date().toISOString();
+      await cacheResult(ObjectType.lift, latestBatch);
+      return res.json(lift);
+    }
+
+  }
+  catch (error) {
+    console.error("Error in PATCH /api/lifts/:name/status:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 export default router;

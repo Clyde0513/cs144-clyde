@@ -6,13 +6,14 @@
       "esModuleInterop": true,
       "allowJs": true,
       "resolveJsonModule": true,
-      "outDir": "dist",
+      "outDir": ".",
+      "rootDir": ".",
       "strict": true,
       "skipLibCheck": true
     },
-    "include": ["./**/*.ts", "./**/*.js"],
+    "include": ["./**/*.ts"],
     "exclude": [
       "node_modules",
-      "**/dist/**",
+      "tests"
     ]
 }

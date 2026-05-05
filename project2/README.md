@@ -414,8 +414,25 @@ npm start
 Create a `README` or `README.md` in the project root. Brief notes *you must include for a grade*:
 
 - For **Task 2A**: which HTTP method you chose for the update endpoint, and a one-sentence justification.
+- Task 2A: I chose PATCH HTTP because I am just updating the name status of lift/trail
+
 - For **Task 4**: confirm your TTL and key shape match the spec; flag any deviation.
+
+- Task 4: The cache TTL is 300 seconds (5 minutes) and the keys are `mammoth:lift:all` and `mammoth:trail:all`.
+
+
 - For **Task 5**: which storage type you used for the active-tab preference.
+
+- Task 5: I used `localStorage` to store the active tab preference because it persists across browser restarts.
+
+
 - For **Task 6A**: which storage type you used for the bearer token.
+
+- Task 6A: I used `sessionStorage` to store the bearer token, because it should be cleared when the browser session ends.
+
+
 - For **Task 6B**: any non-default limit values you used while testing (please commit the defaults).
+
+- Task 6B: I used the default limits (5 requests per minute) for `/api/lifts/*` and `/api/trails/*` and 10 requests per minute for `POST /api/auth/token`.
+
 - Anything special about how to grade your project.

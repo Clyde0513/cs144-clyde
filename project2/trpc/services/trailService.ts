@@ -7,16 +7,39 @@ export const TrailService = {
   // TODO: Implement a method that returns the latest trail array.
   // This should fetch the latest TrailBatch and return its `trails` field,
   // or [] if no batch exists.
+
   async getLatestTrails(): Promise<Trail[]> {
-    console.log("getLatestTrails service method not yet implemented");
-    return [];
+    const LatestTrailBatch = await getLatestBatch(BatchType.TrailBatch);
+
+    if (!LatestTrailBatch) {
+      console.log("No trail batch found");
+      return [];
+    }
+    return LatestTrailBatch.trails;
+    // console.log("getLatestTrails service method not yet implemented");
+    // return [];
   },
 
   // TODO: Implement a method that returns a single trail by name.
   // Search the latest batch for a matching name. Return null if not found.
   async getTrailByName(name: string): Promise<Trail | null> {
-    console.log("getTrailByName service method not yet implemented");
-    return null;
+
+    const LatestTrailBatchByName = await getLatestBatch(BatchType.TrailBatch);
+
+    if (!LatestTrailBatchByName) {
+      console.log("No trail batch found");
+      return null;
+    }
+
+    const trail = LatestTrailBatchByName.trails.find((trail: { name: string; }) => trail.name === name);
+    if (!trail) {
+      console.log(`Trail "${name}" not found in latest batch`);
+      return null;
+    }
+
+    return trail;
+    // console.log("getTrailByName service method not yet implemented");
+    // return null;
   },
 
   // TODO: Implement a method that updates a trail's status in the cache.
@@ -27,7 +50,29 @@ export const TrailService = {
   //   3. update its status
   //   4. cacheResult to write the batch back
   async updateTrailStatus(name: string, status: string): Promise<{ success: boolean, message: string }> {
-    console.log("updateTrailStatus service method not yet implemented");
-    return { success: false, message: "Not implemented" };
+
+    let cachedBatch = await fetchFromCache(BatchType.TrailBatch) as any;
+    
+     if (!cachedBatch) {
+        const mongooBatch = await getLatestBatch(BatchType.TrailBatch);
+        if (!mongooBatch) {
+           return { success: false, message: "No trail batch in cache" };
+         }
+        await cacheResult(BatchType.TrailBatch, mongooBatch);
+        cachedBatch = mongooBatch;
+
+    }
+    const trailIndex = cachedBatch.trails.findIndex((trail: { name: string; }) => trail.name === name);
+    if (trailIndex === -1) {
+      return { success: false, message: `Trail "${name}" not found in cache` };
+    }
+
+    cachedBatch.trails[trailIndex].status = status;
+    await cacheResult(BatchType.TrailBatch, cachedBatch);
+    return { success: true, message: `Trail "${name}" status updated to "${status}"` };
+    
+    
+    // console.log("updateTrailStatus service method not yet implemented");
+    // return { success: false, message: "Not implemented" };
   }
 };

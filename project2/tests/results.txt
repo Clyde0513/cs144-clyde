@@ -1,0 +1,17 @@
+CS 144 Project 2 — Autograder
+Project: /mnt/c/ucla-cs144/project2
+
+[33m  ⚠  NOTE: This local test suite does NOT test the HTTP method
+     for the status-update endpoint. You must determine the
+     correct method yourself. Those tests run only on Gradescope.[0m
+  Started server (pid 3200) with USE_DB=false
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Phase: Fixtures (USE_DB=false)
+  Target: http://localhost:1919
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ERROR: Server not responding. Is it running on port 1919?
+Fixture tests did not all pass — skipping production tests.
+Results written to /tmp/_MEIVDrVX3/results.json
+Report written to  /tmp/_MEIVDrVX3/results.txt
+  Stopped server (pid 3200)

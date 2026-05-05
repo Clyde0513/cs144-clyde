@@ -25,8 +25,12 @@ export async function getLatestBatch(type) {
 
   // TODO: query MongoDB for the most recent batch of this type and return it.
   // Hint: getBatchModel(type) gives you the right Mongoose model.
-  console.log("getLatestBatch (mongo) not yet implemented");
-  return null;
+
+  const model = getBatchModel(type);
+  const latestBatch = await model.findOne({ type }).sort({ timestamp: -1 }).exec();
+  return latestBatch ? latestBatch.toObject() : null;
+  // console.log("getLatestBatch (mongo) not yet implemented");
+  // return null;
 }
 
 // Get the most recent batch with timestamp <= ts.
@@ -42,8 +46,11 @@ export async function getNearestBatch(type, ts) {
 
   // TODO: query MongoDB for the most recent batch of this type with
   // timestamp <= ts, and return it. Return null if no such batch exists.
-  console.log("getNearestBatch (mongo) not yet implemented");
-  return null;
+  const model = getBatchModel(type);
+  const nearestBatch = await model.findOne({ type, timestamp: { $lte: ts } }).sort({ timestamp: -1 }).exec();
+  return nearestBatch ? nearestBatch.toObject() : null;
+  // console.log("getNearestBatch (mongo) not yet implemented");
+  // return null;
 }
 
 export default { getLatestBatch, getNearestBatch };

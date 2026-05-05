@@ -37,7 +37,7 @@ export const mongoUri = DEBUG ? localUri : prodUri;
 export const REDIS_PREFIX = 'mammoth:';
 export const redisOptions = {
   socket: {
-    host: 'localhost',
+    host: '127.0.0.1',
     port: 6379,
   },
 };

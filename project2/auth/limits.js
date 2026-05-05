@@ -37,8 +37,18 @@ const API_RATE_LIMIT   = parseInt(process.env.API_RATE_LIMIT_PER_MINUTE   || '5'
 // like "Rate limit (X req/min) exceeded — retry in Y seconds." A generic
 // 429 with no body is not acceptable.
 function rateLimitHandler(req, res, next, options) {
-  console.log("rate-limit handler not yet implemented");
-  res.status(501).json({ error: "Rate limit handler not implemented" });
+
+  const retryAfterSeconds = Math.ceil((req.rateLimit.resetTime - Date.now()) / 1000);
+  res.set('Retry-After', retryAfterSeconds.toString());
+  res.status(429).json({
+    error: "rate_limit_exceeded",
+    limit: options.max,
+    retryAfter: retryAfterSeconds,
+  });
+
+
+  // console.log("rate-limit handler not yet implemented");
+  // res.status(501).json({ error: "Rate limit handler not implemented" });
 }
 
 // Shared Redis store factory. Same Redis client as the data cache.
@@ -55,8 +65,11 @@ export const tokenIssueLimiter = rateLimit({
   legacyHeaders: false,
   // TODO: Implement me!
   // - keyGenerator: function returning the client IP (req.ip).
+  keyGenerator: (req) => req.ip,
   // - store: makeStore()
+  store: makeStore(),
   // - handler: rateLimitHandler
+  handler: rateLimitHandler
 });
 
 export const apiLimiter = rateLimit({
@@ -68,6 +81,9 @@ export const apiLimiter = rateLimit({
   // - keyGenerator: function returning req.token (populated by bearerAuth).
   //   Fall back to req.ip if req.token is missing — defensive default,
   //   not the real path.
+  keyGenerator: (req) => req.token || req.ip,
   // - store: makeStore()
+  store: makeStore(),
   // - handler: rateLimitHandler
+  handler: rateLimitHandler,
 });

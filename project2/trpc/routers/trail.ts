@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { t } from '../config.js';
 import { TrailService } from '../services/trailService.js';
 import { TrailStatus } from '../../models/Enum.js';
+import { TRPCError } from '@trpc/server';
 
 const router = t.router;
 const publicProcedure = t.procedure;
@@ -18,8 +19,15 @@ export const trailRouter = router({
   // Should return all trails in the current batch, or [] if none exists.
   getLatest: publicProcedure.query(async () => {
     // Student implementation here
-    console.log("getLatest procedure not yet implemented");
-    return [];
+
+
+    const latestTrail = await TrailService.getLatestTrails();
+    if (!latestTrail) {
+      console.log("No trails found");
+      }
+
+    return latestTrail;
+  
   }),
 
   // TODO: Implement a procedure that returns a single trail by name.
@@ -29,8 +37,17 @@ export const trailRouter = router({
     .input(z.object({ name: trailNameSchema }))
     .query(async ({ input }) => {
       // TODO: Implement me!
-      console.log("getByName procedure not yet implemented");
-      return {};
+
+      const trail = await TrailService.getTrailByName(input.name);
+      if (!trail) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: `Trail "${input.name}" not found` });
+      }
+
+      return trail;
+
+
+      // console.log("getByName procedure not yet implemented");
+      // return {};
     }),
 
   // TODO: Implement a procedure that updates a trail's status in Redis.
@@ -48,7 +65,17 @@ export const trailRouter = router({
     }))
     .mutation(async ({ input }) => {
       // TODO: Implement me!
-      console.log("updateStatus procedure not yet implemented");
-      return { success: false, message: "Not implemented" };
+
+      const res = await TrailService.updateTrailStatus(input.name, input.status);
+      if (!res.success) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: res.message });
+      }
+
+
+      return { success: true, message: `Trail "${input.name}" status updated to "${input.status}"` };
+      
+
+      // console.log("updateStatus procedure not yet implemented");
+      // return { success: false, message: "Not implemented" };
     }),
 });

@@ -1,7 +1,9 @@
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import { t } from '../config.js';
 import { LiftService } from '../services/liftService.js';
 import { LiftStatus } from '../../models/Enum.js';
+import { Lift } from '../../models/Lift.js';
 
 const router = t.router;
 const publicProcedure = t.procedure;
@@ -18,8 +20,23 @@ export const liftRouter = router({
   // Should return all lifts in the current batch, or [] if none exists.
   getLatest: publicProcedure.query(async () => {
     // Student implementation here
-    console.log("getLatest procedure not yet implemented");
-    return [];
+    // LiftService.getLatestLifts().then((lifts) => {
+    //   console.log("Latest lifts:", lifts);
+    // }).catch((error) => {
+    //   console.error("Error fetching latest lifts:", error);
+    // });
+
+    const latestLift = await LiftService.getLatestLifts();
+    if (!latestLift) {
+      console.log("No lifts found");
+    } else {
+      []; // or console.log("Latest lifts:", latestLift);
+    }
+
+    
+    // console.log("getLatest procedure not yet implemented");
+    // return [];
+    return latestLift;
   }),
 
   // TODO: Implement a procedure that returns a single lift by name.
@@ -28,9 +45,17 @@ export const liftRouter = router({
   getByName: publicProcedure
     .input(z.object({ name: liftNameSchema }))
     .query(async ({ input }) => {
+
+      // we fetch the lift by name using the service method
+      const lift = await LiftService.getLiftByName(input.name);
+      if (!lift) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: `Lift "${input.name}" not found` });
+      }
+      return lift;
+
       // TODO: Implement me!
-      console.log("getByName procedure not yet implemented");
-      return {};
+      // console.log("getByName procedure not yet implemented");
+      
     }),
 
   // TODO: Implement a procedure that updates a lift's status in Redis.
@@ -48,7 +73,16 @@ export const liftRouter = router({
     }))
     .mutation(async ({ input }) => {
       // TODO: Implement me!
-      console.log("updateStatus procedure not yet implemented");
-      return { success: false, message: "Not implemented" };
+      const res = await LiftService.updateLiftStatus(input.name, input.status);
+      if (!res.success) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: res.message });
+      }
+
+
+      return { success: true, message: `Lift "${input.name}" status updated to "${input.status}"` };
+      
+
+      // console.log("updateStatus procedure not yet implemented");
+      // return { success: false, message: "Not implemented" };
     }),
 });
